@@ -282,24 +282,15 @@ class WingGenerator:
                 # 3. Apply twist around quarter chord
                 if abs(twist_angle) > 0.001:
                     quarter_chord = chord * 0.25
-                    # Move to quarter chord
-                    to_quarter = gp_Trsf()
-                    to_quarter.SetTranslation(gp_Vec(quarter_chord, 0, 0))
-                    transform.Multiply(to_quarter)
     
-                    # Apply twist
+                    # Apply twist around quarter chord
                     twist_rad = np.radians(twist_angle * section_ratio)
                     twist_transform = gp_Trsf()
                     twist_transform.SetRotation(
-                        gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)),
+                        gp_Ax1(gp_Pnt(quarter_chord, 0, 0), gp_Dir(0, 0, 1)),
                         twist_rad
                     )
                     transform.Multiply(twist_transform)
-    
-                    # Move back from quarter chord
-                    from_quarter = gp_Trsf()
-                    from_quarter.SetTranslation(gp_Vec(-quarter_chord, 0, 0))
-                    transform.Multiply(from_quarter)
     
                 # Transform and add section
                 transformed_section = BRepBuilderAPI_Transform(section_wire, transform).Shape()
@@ -487,24 +478,15 @@ class WingGenerator:
         # Apply twist
         if abs(twist_angle) > 0.001:
             quarter_chord = local_chord * 0.25
-            # Move to quarter chord
-            to_quarter = gp_Trsf()
-            to_quarter.SetTranslation(gp_Vec(quarter_chord, 0, 0))
-            transform.Multiply(to_quarter)
     
-            # Apply twist
+            # Apply twist around quarter chord
             twist_rad = np.radians(twist_angle * section_ratio)
             twist_transform = gp_Trsf()
             twist_transform.SetRotation(
-                gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)),
+                gp_Ax1(gp_Pnt(quarter_chord, 0, 0), gp_Dir(0, 0, 1)),
                 twist_rad
             )
             transform.Multiply(twist_transform)
-    
-            # Move back from quarter chord
-            from_quarter = gp_Trsf()
-            from_quarter.SetTranslation(gp_Vec(-quarter_chord, 0, 0))
-            transform.Multiply(from_quarter)
     
         return transform
 
