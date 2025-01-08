@@ -138,77 +138,6 @@ class WingGenerator:
         except Exception as e:
             raise Exception(f"Failed to read airfoil file: {str(e)}")
 
-    def create_airfoil_wire(self, points, scale=1.0, te_tolerance=0.001):
-        """Create a wire from airfoil points, handling trailing edge appropriately"""
-        try:
-            # Scale points
-            scaled_points = points.copy() * scale
-            original_point_count = len(scaled_points)
-    
-            # Constants
-            MIN_POINTS = 20  # Minimum number of points required for airfoil definition
-    
-            print(f"\nTrailing Edge Processing:")
-            print(f"Starting with {original_point_count} points")
-            print(f"Tolerance: {te_tolerance}")
-    
-            # Check for trailing edge gap and trim if necessary
-            # Simple implementation for now - remove two points away from TE
-            while len(scaled_points) > MIN_POINTS:
-                first_point = scaled_points[0]
-                last_point = scaled_points[-1]
-                trailing_edge_gap = np.sqrt(
-                    (last_point[0] - first_point[0])**2 +
-                    (last_point[1] - first_point[1])**2
-                )
-    
-                if trailing_edge_gap < te_tolerance:
-                    print(f"Gap ({trailing_edge_gap:.6f}) < tolerance, trimming points...")
-                    scaled_points = scaled_points[1:-1]
-                else:
-                    print(f"Found suitable trailing edge:")
-                    print(f"- Final point count: {len(scaled_points)}")
-                    print(f"- Points removed: {original_point_count - len(scaled_points)}")
-                    print(f"- Final gap: {trailing_edge_gap:.6f}")
-                    break
-    
-            if len(scaled_points) <= MIN_POINTS:
-                raise RuntimeError(
-                    f"Reached minimum point limit ({MIN_POINTS}) without finding "
-                    f"suitable trailing edge configuration"
-                )
-    
-            # Create array of points
-            array = TColgp_Array1OfPnt(1, len(scaled_points))
-            for i, point in enumerate(scaled_points, 1):
-                array.SetValue(i, gp_Pnt(point[0], point[1], 0))
-    
-            # Create B-spline
-            spline = GeomAPI_PointsToBSpline(array)
-            if not spline.IsDone():
-                raise RuntimeError("Failed to create B-spline")
-    
-            # Create edge from spline
-            spline_edge = BRepBuilderAPI_MakeEdge(spline.Curve()).Edge()
-    
-            # Make wire
-            wire_maker = BRepBuilderAPI_MakeWire()
-            wire_maker.Add(spline_edge)
-    
-            # Create trailing edge
-            first_point = gp_Pnt(scaled_points[0][0], scaled_points[0][1], 0)
-            last_point = gp_Pnt(scaled_points[-1][0], scaled_points[-1][1], 0)
-            trailing_edge = BRepBuilderAPI_MakeEdge(first_point, last_point).Edge()
-            wire_maker.Add(trailing_edge)
-    
-            if not wire_maker.IsDone():
-                raise RuntimeError("Failed to create wire")
-    
-            return wire_maker.Wire()
-    
-        except Exception as e:
-            raise Exception(f"Failed to create airfoil wire: {str(e)}")
-
     def create_wing(self, root_airfoil, span, sweep_angle, taper_ratio=1.0,
                     twist_angle=0.0, tip_airfoil=None, chord_root=1.0, te_tolerance=0.001,
                     num_sections=10, blend_start_section=7):
@@ -315,12 +244,10 @@ class WingGenerator:
             while len(points) > MIN_POINTS:
                 first_point = points[0]
                 last_point = points[-1]
-                trailing_edge_gap = np.sqrt(
-                    (last_point[0] - first_point[0])**2 +
-                    (last_point[1] - first_point[1])**2
-                )
+                trailing_edge_gap = (last_point[0] - first_point[0])**2 + \
+                                    (last_point[1] - first_point[1])**2
     
-                if trailing_edge_gap < te_tolerance:
+                if trailing_edge_gap < te_tolerance**2:
                     points = points[1:-1]
                 else:
                     break
