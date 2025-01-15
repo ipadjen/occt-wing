@@ -5,28 +5,23 @@ import urllib.request as urllib2
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                             QHBoxLayout, QLabel, QLineEdit, QPushButton, QGridLayout,
                             QFileDialog, QTabWidget, QSplitter, QMessageBox, QComboBox,
-                            QProgressDialog, QDialog, QCheckBox)
+                            QProgressDialog, QCheckBox)
 from PyQt5.QtCore import Qt
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from OCC.Display.backend import load_backend
 load_backend('pyqt5')
 from OCC.Display.qtDisplay import qtViewer3d
 from OCC.Core.gp import gp_Pnt, gp_Vec, gp_Trsf, gp_Ax1, gp_Ax2, gp_Dir
-from OCC.Core.BRepBuilderAPI import (BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace,
+from OCC.Core.BRepBuilderAPI import (BRepBuilderAPI_MakeWire,
                                     BRepBuilderAPI_MakeEdge, BRepBuilderAPI_Transform)
 from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_ThruSections
 from OCC.Core.GeomAPI import GeomAPI_PointsToBSpline
 from OCC.Core.TColgp import TColgp_Array1OfPnt
-from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakePrism
 from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Fuse
-from OCC.Core.BRep import BRep_Builder
-from OCC.Core.TopoDS import TopoDS_Shell
 from OCC.Core.STEPControl import STEPControl_Writer, STEPControl_AsIs
 from OCC.Core.Interface import Interface_Static_SetCVal
 from OCC.Core.IFSelect import IFSelect_RetDone
-from OCC.Core.gp import gp_Pln, gp_Pnt, gp_Dir
 
 class WingGenerator:
     def __init__(self):
