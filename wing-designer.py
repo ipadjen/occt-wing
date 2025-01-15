@@ -133,16 +133,17 @@ class WingGenerator:
         except Exception as e:
             raise Exception(f"Failed to read airfoil file: {str(e)}")
 
-    def create_wing(self, root_airfoil, span, sweep_angle, taper_ratio=1.0,
+    def create_wing(self, root_airfoil, span, sweep_angle=0.0, taper_ratio=1.0,
                     twist_angle=0.0, tip_airfoil=None, chord_root=1.0, te_tolerance=0.001,
-                    num_sections=10, blend_start_section=7):
+                    num_sections=10, blend_start_section=7, ellipse=0):
         """
         Create a wing with multiple sections and gradual airfoil blending
 
-        Hardcoded parameters:
+        Some parameters:
         num_sections=10 - number of sections for loft operation
-        blend_start_section=7 - section number when blending between
-                                different airfoil starts
+        blend_start_section=0.7 - percentage of span when blending between
+                                  different airfoil starts
+        ellipse - 0 for no ellipse, 1 for half ellipse, 2 for full ellipse
         """
         try:
             # Process root airfoil
@@ -174,14 +175,34 @@ class WingGenerator:
             generator.CheckCompatibility(False)
     
             for i in range(num_sections):
+                x_offset = 0 # Initialize x_offset
                 # Calculate section parameters
                 section_ratio = i / (num_sections - 1)
                 z_pos = span * section_ratio
-                chord = chord_root * (1 - section_ratio * (1 - taper_ratio))
-    
+                # Calculate spanwise position relative to root (0 to 1)
+                z_rel = z_pos / span
+
+                if ellipse == 0:
+                    chord = chord_root * (1 - section_ratio * (1 - taper_ratio))
+                else:
+                    tip_chord = chord_root * taper_ratio
+                    if ellipse == 1: # Half ellipse
+                        if section_ratio < 0.99:  # Allow some margin before tip
+                            min_chord = tip_chord
+                            chord_range = chord_root - min_chord
+                            elliptical_ratio = np.sqrt(1 - (z_rel * z_rel))
+                            chord = min_chord + (chord_range * elliptical_ratio)
+                        else:
+                            chord = tip_chord
+                        x_offset = 0
+                    else: # Full ellipse
+                        chord = chord_root * np.sqrt(1 - (z_rel * z_rel))
+                        chord = max(chord, tip_chord)
+                        x_offset = (chord_root - chord) / 2
+
                 # Calculate blending factor for airfoil shape
-                if i >= blend_start_section - 1:
-                    blend_ratio = (i - (blend_start_section - 1)) / (num_sections - blend_start_section)
+                if z_rel >= blend_start_section:
+                    blend_ratio = (z_rel - blend_start_section) / (1.0 - blend_start_section + 1e-7)
                     blend_ratio = min(1.0, max(0.0, blend_ratio))
                     section_points = (1 - blend_ratio) * root_points + blend_ratio * tip_points
                 else:
@@ -196,9 +217,10 @@ class WingGenerator:
                 # 1. Move section to span position
                 self.add_translation(transform, gp_Vec(0, 0, z_pos))
 
-                # 2. Apply sweep
-                sweep_rad = np.radians(sweep_angle)
-                x_offset = z_pos * np.tan(sweep_rad)
+                # 2. Apply x translation (sweep or ellipse movement)
+                if ellipse == 0:
+                    sweep_rad = np.radians(sweep_angle)
+                    x_offset = z_pos * np.tan(sweep_rad)
                 self.add_translation(transform, gp_Vec(x_offset, 0, 0))
 
                 # 3. Apply twist around quarter chord
@@ -333,101 +355,6 @@ class WingGenerator:
 
         except Exception as e:
             raise Exception(f"Failed to add rotation: {str(e)}")
-
-    def create_elliptical_wing(self, root_points, tip_points, span, chord_root,
-                              twist_angle, te_tolerance, tip_chord, full_elliptical=False):
-        """Create an elliptical wing using consistent wire creation method"""
-        try:
-            # Process trailing edges for root and tip airfoils
-            root_points = self.process_trailing_edge(root_points, te_tolerance)
-            tip_points = self.process_trailing_edge(tip_points, te_tolerance)
-    
-            # Ensure both airfoils have the same number of points
-            if len(root_points) != len(tip_points):
-                target_length = min(len(root_points), len(tip_points))
-                root_points = self.resample_airfoil(root_points, target_length)
-                tip_points = self.resample_airfoil(tip_points, target_length)
-    
-            generator = BRepOffsetAPI_ThruSections(True, True)
-            generator.CheckCompatibility(False)
-    
-            # Main wing sections
-            num_sections = 40
-            for i in range(num_sections):
-                section_ratio = i / (num_sections - 1)
-                z_pos = span * section_ratio
-    
-                # Calculate spanwise position relative to root (0 to 1)
-                y_rel = z_pos / span
-    
-                if full_elliptical:
-                    # Original method for full elliptical
-                    local_chord = chord_root * np.sqrt(1 - (y_rel * y_rel))
-                    local_chord = max(local_chord, tip_chord)
-                    x_offset = (chord_root - local_chord) / 2
-                else:
-                    # New method for half elliptical
-                    if section_ratio < 0.99:  # Allow some margin before tip
-                        min_chord = tip_chord
-                        chord_range = chord_root - min_chord
-                        elliptical_ratio = np.sqrt(1 - (y_rel * y_rel))
-                        local_chord = min_chord + (chord_range * elliptical_ratio)
-                    else:
-                        local_chord = tip_chord
-                    x_offset = 0
-    
-                # Blend between root and tip airfoils
-                blend_ratio = section_ratio
-                section_points = (1 - blend_ratio) * root_points + blend_ratio * tip_points
-    
-                # Create section wire using the same method as regular wings
-                wire = self.create_section_wire(section_points, scale=local_chord)
-    
-                # Create transformation
-                transform = self.create_section_transform(z_pos, local_chord,
-                                                       section_ratio, twist_angle)
-    
-                # Add x-offset for full elliptical
-                if x_offset != 0:
-                    offset_transform = gp_Trsf()
-                    offset_transform.SetTranslation(gp_Vec(x_offset, 0, 0))
-                    transform.Multiply(offset_transform)
-    
-                # Transform and add section
-                transformed_section = BRepBuilderAPI_Transform(wire, transform).Shape()
-                generator.AddWire(transformed_section)
-    
-            generator.Build()
-            if not generator.IsDone():
-                raise RuntimeError("ThruSections failed to build the wing")
-    
-            return generator.Shape()
-    
-        except Exception as e:
-            print(f"\nError details: {str(e)}")
-            raise Exception(f"Failed to create elliptical wing: {str(e)}")
-
-    def create_section_transform(self, z_pos, local_chord, section_ratio, twist_angle):
-        """Create transformation for wing section"""
-        transform = gp_Trsf()
-        
-        # Move section to span position
-        transform.SetTranslation(gp_Vec(0, 0, z_pos))
-    
-        # Apply twist
-        if abs(twist_angle) > 0.001:
-            quarter_chord = local_chord * 0.25
-    
-            # Apply twist around quarter chord
-            twist_rad = np.radians(twist_angle * section_ratio)
-            twist_transform = gp_Trsf()
-            twist_transform.SetRotation(
-                gp_Ax1(gp_Pnt(quarter_chord, 0, 0), gp_Dir(0, 0, 1)),
-                twist_rad
-            )
-            transform.Multiply(twist_transform)
-    
-        return transform
 
     def export_step(self, shape, filename):
         """Export shape to STEP file"""
@@ -592,7 +519,7 @@ class WingDesignerGUI(QMainWindow):
             'span': ('Half Wing Span (m)', '10.0'),
             'chord_root': ('Root Chord (m)', '2.0'),
             'twist_angle': ('Twist Angle (deg)', '2.0'),
-            'te_tolerance': ('Trailing Edge Tolerance', '0.001')
+            'te_tolerance': ('Trailing Edge Tolerance (m)', '0.001')
         }
     
         # Tapered wing specific parameters
@@ -943,11 +870,11 @@ class WingDesignerGUI(QMainWindow):
                     root_airfoil=root_points,
                     tip_airfoil=tip_points,
                     span=half_span,
-                    sweep_angle=0,
                     taper_ratio=1.0,
                     twist_angle=twist_angle,
                     chord_root=chord_root,
-                    te_tolerance=te_tolerance
+                    te_tolerance=te_tolerance,
+                    ellipse=0
                 )
     
             elif wing_type == "Tapered":
@@ -974,7 +901,8 @@ class WingDesignerGUI(QMainWindow):
                     taper_ratio=taper_ratio,
                     twist_angle=twist_angle,
                     chord_root=chord_root,
-                    te_tolerance=te_tolerance
+                    te_tolerance=te_tolerance,
+                    ellipse=0
                 )
     
             elif wing_type == "Swept":
@@ -989,22 +917,29 @@ class WingDesignerGUI(QMainWindow):
                     taper_ratio=tip_chord / chord_root,
                     twist_angle=twist_angle,
                     chord_root=chord_root,
-                    te_tolerance=te_tolerance
+                    te_tolerance=te_tolerance,
+                    ellipse=0
                 )
     
             elif wing_type == "Elliptical":
                 tip_chord = float(self.inputs['elliptical_tip_chord'].text())
                 full_elliptical = self.full_elliptical.isChecked()
-    
-                self.current_wing = self.wing_generator.create_elliptical_wing(
-                    root_points=root_points,
-                    tip_points=tip_points,
+
+                if full_elliptical:
+                    ellipse=2
+                else:
+                    ellipse=1
+
+                self.current_wing = self.wing_generator.create_wing(
+                    root_airfoil=root_points,
+                    tip_airfoil=tip_points,
                     span=half_span,
-                    chord_root=chord_root,
+                    taper_ratio=tip_chord / chord_root,
                     twist_angle=twist_angle,
+                    chord_root=chord_root,
                     te_tolerance=te_tolerance,
-                    tip_chord=tip_chord,
-                    full_elliptical=full_elliptical
+                    num_sections=40,
+                    ellipse=ellipse
                 )
     
             # Check if full wing is required
