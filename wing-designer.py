@@ -194,33 +194,28 @@ class WingGenerator:
                 transform = gp_Trsf()
     
                 # 1. Move section to span position
-                transform.SetTranslation(gp_Vec(0, 0, z_pos))
-    
+                self.add_translation(transform, gp_Vec(0, 0, z_pos))
+
                 # 2. Apply sweep
                 sweep_rad = np.radians(sweep_angle)
                 x_offset = z_pos * np.tan(sweep_rad)
-                sweep_transform = gp_Trsf()
-                sweep_transform.SetTranslation(gp_Vec(x_offset, 0, 0))
-                transform.Multiply(sweep_transform)
-    
+                self.add_translation(transform, gp_Vec(x_offset, 0, 0))
+
                 # 3. Apply twist around quarter chord
                 if abs(twist_angle) > 0.001:
                     quarter_chord = chord * 0.25
     
                     # Apply twist around quarter chord
                     twist_rad = np.radians(twist_angle * section_ratio)
-                    twist_transform = gp_Trsf()
-                    twist_transform.SetRotation(
-                        gp_Ax1(gp_Pnt(quarter_chord, 0, 0), gp_Dir(0, 0, 1)),
-                        twist_rad
-                    )
-                    transform.Multiply(twist_transform)
-    
+                    self.add_rotation(transform, twist_rad, gp_Dir(0, 0, 1),
+                                    gp_Pnt(quarter_chord, 0, 0))
+
                 # Transform and add section
                 transformed_section = BRepBuilderAPI_Transform(section_wire, transform).Shape()
                 generator.AddWire(transformed_section)
     
             generator.Build()
+
             if not generator.IsDone():
                 raise RuntimeError("Failed to create wing")
     
@@ -316,6 +311,28 @@ class WingGenerator:
 
         except Exception as e:
             raise Exception(f"Failed to resample airfoil: {str(e)}")
+
+    def add_translation(self, transform_matrix, transform_vec):
+        """Add translation to transformation matrix"""
+        try:
+            translation = gp_Trsf()
+            translation.SetTranslation(transform_vec)
+            transform_matrix.Multiply(translation)
+            return transform_matrix
+
+        except Exception as e:
+            raise Exception(f"Failed to add translation: {str(e)}")
+
+    def add_rotation(self, transform_matrix, rotation_angle, rotation_dir, rotation_pt=gp_Pnt(0, 0, 0)):
+        """Add rotation to transformation matrix"""
+        try:
+            rotation = gp_Trsf()
+            rotation.SetRotation(gp_Ax1(rotation_pt, rotation_dir), rotation_angle)
+            transform_matrix.Multiply(rotation)
+            return transform_matrix
+
+        except Exception as e:
+            raise Exception(f"Failed to add rotation: {str(e)}")
 
     def create_elliptical_wing(self, root_points, tip_points, span, chord_root,
                               twist_angle, te_tolerance, tip_chord, full_elliptical=False):
