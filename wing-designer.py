@@ -135,7 +135,7 @@ class WingGenerator:
 
     def create_wing(self, root_airfoil, span, sweep_angle=0.0, taper_ratio=1.0,
                     twist_angle=0.0, tip_airfoil=None, chord_root=1.0, te_tolerance=0.001,
-                    num_sections=10, blend_start_section=7, ellipse=0):
+                    num_sections=10, blend_start_section=0.7, ellipse=0):
         """
         Create a wing with multiple sections and gradual airfoil blending
 
