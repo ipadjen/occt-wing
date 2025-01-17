@@ -24,7 +24,7 @@ from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Fuse
 from OCC.Core.BRep import BRep_Builder
 from OCC.Core.TopoDS import TopoDS_Shell
 from OCC.Core.STEPControl import STEPControl_Writer, STEPControl_AsIs
-from OCC.Core.Interface import Interface_Static_SetCVal
+from OCC.Core.Interface import Interface_Static
 from OCC.Core.IFSelect import IFSelect_RetDone
 from OCC.Core.gp import gp_Pln, gp_Pnt, gp_Dir
 
@@ -421,7 +421,8 @@ class WingGenerator:
         """Export shape to STEP file"""
         try:
             writer = STEPControl_Writer()
-            Interface_Static_SetCVal("write.step.schema", "AP214")
+            Interface_Static.SetCVal("write.step.schema", "AP214")
+            Interface_Static.SetCVal("write.step.unit","M")
 
             status = writer.Transfer(shape, STEPControl_AsIs)
             if status != IFSelect_RetDone:
