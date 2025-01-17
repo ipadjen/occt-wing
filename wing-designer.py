@@ -874,8 +874,7 @@ class WingDesignerGUI(QMainWindow):
                     taper_ratio=1.0,
                     twist_angle=twist_angle,
                     chord_root=chord_root,
-                    te_tolerance=te_tolerance,
-                    ellipse=0
+                    te_tolerance=te_tolerance
                 )
     
             elif wing_type == "Tapered":
@@ -902,8 +901,7 @@ class WingDesignerGUI(QMainWindow):
                     taper_ratio=taper_ratio,
                     twist_angle=twist_angle,
                     chord_root=chord_root,
-                    te_tolerance=te_tolerance,
-                    ellipse=0
+                    te_tolerance=te_tolerance
                 )
     
             elif wing_type == "Swept":
@@ -918,8 +916,7 @@ class WingDesignerGUI(QMainWindow):
                     taper_ratio=tip_chord / chord_root,
                     twist_angle=twist_angle,
                     chord_root=chord_root,
-                    te_tolerance=te_tolerance,
-                    ellipse=0
+                    te_tolerance=te_tolerance
                 )
     
             elif wing_type == "Elliptical":
