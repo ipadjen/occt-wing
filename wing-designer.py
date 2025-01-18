@@ -250,7 +250,6 @@ class WingGenerator:
         """Process trailing edge of airfoil points"""
         try:
             points = points.copy()  # Work with a copy to preserve original
-            original_point_count = len(points)
             MIN_POINTS = 20
     
             while len(points) > MIN_POINTS:
