@@ -176,18 +176,9 @@ class WingGenerator:
                     chord = chord_root * (1 - section_ratio * (1 - taper_ratio))
                 else:
                     tip_chord = chord_root * taper_ratio
-                    if ellipse == 1: # Half ellipse
-                        if section_ratio < 0.99:  # Allow some margin before tip
-                            min_chord = tip_chord
-                            chord_range = chord_root - min_chord
-                            elliptical_ratio = np.sqrt(1 - (z_rel * z_rel))
-                            chord = min_chord + (chord_range * elliptical_ratio)
-                        else:
-                            chord = tip_chord
-                        x_offset = 0
-                    else: # Full ellipse
-                        chord = chord_root * np.sqrt(1 - (z_rel * z_rel))
-                        chord = max(chord, tip_chord)
+                    chord = chord_root * np.sqrt(1 - (z_rel * z_rel))
+                    chord = max(chord, tip_chord)
+                    if ellipse == 2: # Only full ellipse, move chord
                         x_offset = (chord_root - chord) / 2
 
                 # Calculate blending factor for airfoil shape
