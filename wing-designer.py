@@ -133,8 +133,8 @@ class WingGenerator:
         except Exception as e:
             raise Exception(f"Failed to read airfoil file: {str(e)}")
 
-    def create_wing(self, root_airfoil, span, sweep_angle=0.0, taper_ratio=1.0,
-                    twist_angle=0.0, tip_airfoil=None, chord_root=1.0, te_tolerance=0.001,
+    def create_wing(self, root_points, span, sweep_angle=0.0, taper_ratio=1.0,
+                    twist_angle=0.0, tip_points=None, chord_root=1.0, te_tolerance=0.001,
                     num_sections=10, blend_start_section=0.7, ellipse=0):
         """
         Create a wing with multiple sections and gradual airfoil blending
@@ -146,20 +146,10 @@ class WingGenerator:
         ellipse - 0 for no ellipse, 1 for half ellipse, 2 for full ellipse
         """
         try:
-            # Process root airfoil
-            if isinstance(root_airfoil, str) and len(root_airfoil) == 4:
-                root_points = self.generate_naca4(root_airfoil)
-            else:
-                root_points = np.array(root_airfoil)
-    
             # Process tip airfoil
-            if tip_airfoil is None:
+            if tip_points is None:
                 tip_points = root_points.copy()
-            elif isinstance(tip_airfoil, str) and len(tip_airfoil) == 4:
-                tip_points = self.generate_naca4(tip_airfoil)
-            else:
-                tip_points = np.array(tip_airfoil)
-    
+
             # Process trailing edges for root and tip airfoils
             root_points = self.process_trailing_edge(root_points, te_tolerance)
             tip_points = self.process_trailing_edge(tip_points, te_tolerance)
@@ -354,6 +344,24 @@ class WingGenerator:
 
         except Exception as e:
             raise Exception(f"Failed to add rotation: {str(e)}")
+
+    def mirror_wing(self, wing):
+        try:
+            # Create mirror transformation
+            mirror_trsf = gp_Trsf()
+            # Mirror about XZ plane (Y=0) instead of XY plane
+            mirror_trsf.SetMirror(gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)))  # Ax2 needed for symmetry
+
+            # Create mirrored wing
+            mirror_wing = BRepBuilderAPI_Transform(wing, mirror_trsf).Shape()
+
+            # Fuse original and mirrored wings
+            wing = BRepAlgoAPI_Fuse(wing, mirror_wing).Shape()
+
+            return wing
+
+        except Exception as e:
+            raise Exception(f"Failed to mirror wing: {str(e)}")
 
     def export_step(self, shape, filename):
         """Export shape to STEP file"""
@@ -579,7 +587,7 @@ class WingDesignerGUI(QMainWindow):
         tapered_checkbox_layout.addWidget(self.le_taper)
         tapered_checkbox_layout.addWidget(self.te_taper)
         self.params_layout.addWidget(self.tapered_checkbox_group, row, 0, 1, 2)
-        self.param_widgets['tapered_checkboxes'] = (self.tapered_checkbox_group,)
+        self.param_widgets['tapered_checkboxes'] = self.tapered_checkbox_group
         row += 1
     
         # Add swept parameters
@@ -867,8 +875,8 @@ class WingDesignerGUI(QMainWindow):
     
             if wing_type == "Straight":
                 self.current_wing = self.wing_generator.create_wing(
-                    root_airfoil=root_points,
-                    tip_airfoil=tip_points,
+                    root_points=root_points,
+                    tip_points=tip_points,
                     span=half_span,
                     taper_ratio=1.0,
                     twist_angle=twist_angle,
@@ -893,8 +901,8 @@ class WingDesignerGUI(QMainWindow):
                     sweep_angle = 0
     
                 self.current_wing = self.wing_generator.create_wing(
-                    root_airfoil=root_points,
-                    tip_airfoil=tip_points,
+                    root_points=root_points,
+                    tip_points=tip_points,
                     span=half_span,
                     sweep_angle=sweep_angle,
                     taper_ratio=taper_ratio,
@@ -908,8 +916,8 @@ class WingDesignerGUI(QMainWindow):
                 le_sweep = float(self.inputs['le_sweep'].text())
     
                 self.current_wing = self.wing_generator.create_wing(
-                    root_airfoil=root_points,
-                    tip_airfoil=tip_points,
+                    root_points=root_points,
+                    tip_points=tip_points,
                     span=half_span,
                     sweep_angle=le_sweep,
                     taper_ratio=tip_chord / chord_root,
@@ -928,8 +936,8 @@ class WingDesignerGUI(QMainWindow):
                     ellipse=1
 
                 self.current_wing = self.wing_generator.create_wing(
-                    root_airfoil=root_points,
-                    tip_airfoil=tip_points,
+                    root_points=root_points,
+                    tip_points=tip_points,
                     span=half_span,
                     taper_ratio=tip_chord / chord_root,
                     twist_angle=twist_angle,
@@ -941,17 +949,8 @@ class WingDesignerGUI(QMainWindow):
     
             # Check if full wing is required
             if self.full_wing_checkbox.isChecked():
-                # Create mirror transformation
-                mirror_trsf = gp_Trsf()
-                # Mirror about XZ plane (Y=0) instead of XY plane
-                mirror_trsf.SetMirror(gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))) #Ax2 needed for symmetry
-            
-                # Create mirrored wing
-                mirror_wing = BRepBuilderAPI_Transform(self.current_wing, mirror_trsf).Shape()
+                self.current_wing = self.wing_generator.mirror_wing(self.current_wing)
 
-                # Fuse original and mirrored wings
-                self.current_wing = BRepAlgoAPI_Fuse(self.current_wing, mirror_wing).Shape()
-    
             # Update 3D viewer
             self.wing_viewer._display.EraseAll()
             self.wing_viewer._display.DisplayShape(self.current_wing, update=True)
