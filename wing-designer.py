@@ -527,7 +527,7 @@ class WingDesignerGUI(QMainWindow):
             'span': ('Half Wing Span (m)', '10.0'),
             'chord_root': ('Root Chord (m)', '2.0'),
             'twist_angle': ('Twist Angle (deg)', '2.0'),
-            'te_tolerance': ('Trailing Edge Tolerance (m)', '0.001')
+            'te_tolerance': ('Trailing Edge Tolerance', '0.001')
         }
     
         # Tapered wing specific parameters
